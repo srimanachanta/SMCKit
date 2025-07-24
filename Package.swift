@@ -6,19 +6,19 @@ import PackageDescription
 let package = Package(
     name: "SMCKit",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v11)
     ],
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
-        .library(
-            name: "SMCKit",
-            targets: ["SMCKit"]),
+        .library(name: "SMCKit", targets: ["SMCKit"]),
     ],
     targets: [
+        .target(name: "SMC",
+                publicHeadersPath: "include"),
+        
         // Targets are the basic building blocks of a package, defining a module or a test suite.
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
-            name: "SMCKit"),
-
+            name: "SMCKit", dependencies: ["SMC"]),
     ]
 )

@@ -1,133 +1,123 @@
 import Foundation
 import IOKit
+import SMC
 
+class SMCKit {
+  public static let shared = SMCKit()
 
-actor SMCConnection {
-    private var connection: io_connect_t = 0
-    private var isOpen: Bool = false
-    
-    func open() throws {
-        guard !isOpen else { return }
-        
-        let service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"))
-        guard service != 0 else {
-            throw SMCError.driverNotFound
-        }
-        
-        guard IOServiceOpen(service, mach_task_self_, 0, &connection) == kIOReturnSuccess else {
-            throw SMCError.failedToOpen
-        }
-        defer {
-            IOObjectRelease(service)
-        }
-        
-        isOpen = true
-    }
-    
-    func close() {
-        guard isOpen else { return }
+  private var connection: io_connect_t = 0
 
-        IOServiceClose(connection)
-        isOpen = false
-    }
-    
-    func call(_ input: inout SMCParamStruct, selector: SMCParamStruct.Selector = .kSMCHandleYPCEvent) throws -> SMCParamStruct {
-        assert(MemoryLayout<SMCParamStruct>.stride == 80)
-        
-        var output = SMCParamStruct()
-        var outputSize = MemoryLayout<SMCParamStruct>.stride
-        let inputSize = MemoryLayout<SMCParamStruct>.stride
+  private init() {
+    var conn: io_connect_t = 0
+    let result = SMCOpen(&conn)
 
-        let result = IOConnectCallStructMethod(connection,
-                                               UInt32(selector.rawValue),
-                                               &input,
-                                               inputSize,
-                                               &output,
-                                               &outputSize)
-        
-        switch (result, output.result) {
-        case (kIOReturnSuccess, SMCParamStruct.Result.kSMCSuccess.rawValue):
-            return output
-        case (kIOReturnSuccess, SMCParamStruct.Result.kSMCKeyNotFound.rawValue):
-            throw SMCError.keyNotFound(code: input.key.toString())
-        case (kIOReturnNotPrivileged, _):
-            throw SMCError.notPrivileged
-        default:
-            throw SMCError.unknown(kIOReturn: result, SMCResult: output.result)
-        }
+    // A fatal error is appropriate here, as the library is unusable
+    // without a connection to the SMC driver.
+    guard result == kIOReturnSuccess else {
+      fatalError("SMCKit: Failed to open connection to AppleSMC. Error: \(result)")
     }
-}
+    self.connection = conn
+  }
 
-public enum SMCKit {
-    private static let conn = SMCConnection()
-    
-    public static func keyInformation(_ key: FourCharCode) async throws -> DataType {
-        var inputStruct = SMCParamStruct()
-        inputStruct.key = key
-        inputStruct.data8 = SMCParamStruct.Selector.kSMCGetKeyInfo.rawValue
-    
-        let outputStruct = try await conn.call(&inputStruct)
-        
-        return DataType(type: outputStruct.keyInfo.dataType,
-                        size: outputStruct.keyInfo.dataSize)
-    }
-    
-    public static func isKeyFound(_ code: FourCharCode) async throws -> Bool {
-        do {
-            _ = try await keyInformation(code)
-        } catch SMCError.keyNotFound { return false }
+  deinit {
+    SMCCleanupCache()
+    SMCClose(connection)
+  }
 
-        return true
-    }
-    
-    public static func numKeys() async throws -> UInt32 {
-        let key = SMCKey<UInt32>("#KEY")
-        return try await read(key)
-    }
-    
-    // TODO
-    //    /// Get all valid SMC keys for this machine
-    //    static func allKeys() throws -> [SMCKey] {
-    //        let count = try keyCount()
-    //        var keys = [SMCKey]()
-    //
-    //        for i in 0 ..< count {
-    //            let key = try keyInformationAtIndex(i)
-    //            let info = try keyInformation(key)
-    //            keys.append(SMCKey(code: key, info: info))
-    //        }
-    //
-    //        return keys
-    //    }
-    
-    public static func read<V: SMCDecodable>(_ key: SMCKey<V>) async throws -> V {
-        try await conn.open()
-        
-        var input = SMCParamStruct()
-        input.key = key.code
-        input.keyInfo.dataSize = UInt32(key.info.size)
-        input.data8 = SMCParamStruct.Selector.kSMCReadKey.rawValue
-        
-        let out = try await conn.call(&input)
+  public func getKeyInformation(_ key: FourCharCode) throws -> DataType {
+    var keyInfo = SMCKeyData_keyInfo_t()
+    let result = SMCGetKeyInfo(key, &keyInfo, self.connection)
 
-        // SMC always gives you a 32‑byte array; delegate the interpretation:
-        return try V(out.bytes)
+    switch (result.kern_res, result.smc_res) {
+    case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+      return DataType(type: keyInfo.dataType, size: UInt32(keyInfo.dataSize))
+    case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+      throw SMCError.keyNotFound(code: key.toString())
+    case (kIOReturnNotPrivileged, _):
+      throw SMCError.notPrivileged
+    default:
+      throw SMCError.unknown(kIOReturn: result.kern_res, SMCResult: result.smc_res)
     }
-    
-    public static func write<V: SMCEncodable>( _ key: SMCKey<V>, _ value: V) async throws {
-        try await conn.open()
+  }
 
-        var input = SMCParamStruct()
-        input.key = key.code
-        try input.bytes = value.encodeSMC()
-        input.keyInfo.dataSize = UInt32(key.info.size)
-        input.data8 = SMCParamStruct.Selector.kSMCWriteKey.rawValue
+  public func isKeyFound(_ key: FourCharCode) throws -> Bool {
+    do {
+      let _ = try getKeyInformation(key)
+      return true
+    } catch SMCError.keyNotFound {
+      return false
+    } catch let error {
+      throw error
+    }
+  }
 
-        _ = try await conn.call(&input)
+  public func read<V: SMCCodable>(_ key: FourCharCode) throws -> V {
+    var keyCharArray = key.toCharArray()
+    var smcVal = SMCVal_t()
+
+    let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
+
+    switch (result.kern_res, result.smc_res) {
+    case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+      return try V(smcVal.bytes)
+    case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+      throw SMCError.keyNotFound(code: key.toString())
+    case (kIOReturnNotPrivileged, _):
+      throw SMCError.notPrivileged
+    default:
+      throw SMCError.unknown(kIOReturn: result.kern_res, SMCResult: result.smc_res)
     }
-    
-    
-    public static func close() async {
-        await conn.close()
+  }
+
+  public func write<V: SMCCodable>(_ key: FourCharCode, _ value: V) throws {
+    let buf = SMCVal_t(
+      key: key.toCharArray(),
+      dataSize: V.smcDataType.size,
+      dataType: V.smcDataType.type.toCharArray(),
+      bytes: try value.encode()
+    )
+
+    let result = SMCWriteKey(buf, self.connection)
+
+    switch (result.kern_res, result.smc_res) {
+    case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+      throw SMCError.keyNotFound(code: key.toString())
+    case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
+      throw SMCError.dataTypeMismatch
+    case (kIOReturnNotPrivileged, _):
+      throw SMCError.notPrivileged
+    default:
+      throw SMCError.unknown(kIOReturn: result.kern_res, SMCResult: result.smc_res)
     }
+  }
+
+  public func numKeys() throws -> UInt32 {
+    return try self.read(FourCharCode(fromStaticString: "#KEY"))
+  }
+
+  public func allKeys() throws -> [FourCharCode] {
+    let numKeys = try self.numKeys()
+
+    let keys = try (0..<numKeys).compactMap { index in
+      let smcIndex = index + 1
+      var keyBuffer: UInt32Char_t = (0, 0, 0, 0, 0)
+
+      let result = SMCGetKeyFromIndex(smcIndex, &keyBuffer, self.connection)
+
+      switch (result.kern_res, result.smc_res) {
+      case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+        return FourCharCode(fromCharArray: keyBuffer)
+      case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+        throw SMCError.keyNotFound(code: "Index \(smcIndex)")
+      case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
+        throw SMCError.dataTypeMismatch
+      case (kIOReturnNotPrivileged, _):
+        throw SMCError.notPrivileged
+      default:
+        throw SMCError.unknown(kIOReturn: result.kern_res, SMCResult: result.smc_res)
+      }
+    }
+
+    return keys
+  }
 }
