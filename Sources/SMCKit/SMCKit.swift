@@ -99,16 +99,15 @@ public class SMCKit {
     let numKeys = try self.numKeys()
 
     let keys = try (0..<numKeys).compactMap { index in
-      let smcIndex = index + 1
       var keyBuffer: UInt32Char_t = (0, 0, 0, 0, 0)
 
-      let result = SMCGetKeyFromIndex(smcIndex, &keyBuffer, self.connection)
+      let result = SMCGetKeyFromIndex(index, &keyBuffer, self.connection)
 
       switch (result.kern_res, result.smc_res) {
       case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
         return FourCharCode(fromCharArray: keyBuffer)
       case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-        throw SMCError.keyNotFound(code: "Index \(smcIndex)")
+        throw SMCError.keyNotFound(code: "Index \(index)")
       case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
         throw SMCError.dataTypeMismatch
       case (kIOReturnNotPrivileged, _):
