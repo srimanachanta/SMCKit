@@ -1,7 +1,7 @@
 import Foundation
 import SMC
 
-extension FourCharCode {
+public extension FourCharCode {
   public init(fromStaticString str: StaticString) {
     precondition(str.utf8CodeUnitCount == 4)
 
@@ -26,7 +26,7 @@ extension FourCharCode {
     return String(bytes.map { Character(UnicodeScalar($0)) })
   }
 
-  public func toCharArray() -> UInt32Char_t {
+  internal func toCharArray() -> UInt32Char_t {
     return (
       UInt8((self >> 24) & 0xFF),
       UInt8((self >> 16) & 0xFF),
@@ -38,12 +38,12 @@ extension FourCharCode {
 }
 
 public struct DataType: Equatable {
-  let type: FourCharCode
-  let size: UInt32
+  public let type: FourCharCode
+  public let size: UInt32
 }
 
 // TODO Other DataTypes from other machines?
-public enum DataTypes {
+enum DataTypes {
   static let UInt8 = DataType(type: FourCharCode(fromStaticString: "ui8 "), size: 1)
   static let UInt16 = DataType(type: FourCharCode(fromStaticString: "ui16"), size: 2)
   static let UInt32 = DataType(type: FourCharCode(fromStaticString: "ui32"), size: 4)

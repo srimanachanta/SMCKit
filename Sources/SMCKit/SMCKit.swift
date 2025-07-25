@@ -2,7 +2,7 @@ import Foundation
 import IOKit
 import SMC
 
-class SMCKit {
+public class SMCKit {
   public static let shared = SMCKit()
 
   private var connection: io_connect_t = 0
