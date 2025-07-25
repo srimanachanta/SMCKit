@@ -80,6 +80,8 @@ public class SMCKit {
     let result = SMCWriteKey(buf, self.connection)
 
     switch (result.kern_res, result.smc_res) {
+    case(kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+        break
     case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
       throw SMCError.keyNotFound(code: key.toString())
     case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
