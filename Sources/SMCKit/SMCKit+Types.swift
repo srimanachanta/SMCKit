@@ -65,9 +65,11 @@ public protocol SMCCodable {
 }
 
 @inlinable func smcBytes(_ slice: [UInt8]) -> SMCBytes_t {
-  var tmp = [UInt8](repeating: 0, count: 32)
-  tmp.replaceSubrange(0..<min(slice.count, 32), with: slice)
-  return unsafeBitCast(tmp, to: SMCBytes_t.self)
+    var tmp = [UInt8](repeating: 0, count: 32);
+    tmp.replaceSubrange(0..<min(slice.count, 32), with: slice);
+    return tmp.withUnsafeBytes {
+        $0.load(as: SMCBytes_t.self)
+    }
 }
 
 @inlinable func toBytes<T>(_ v: T) -> [UInt8] { withUnsafeBytes(of: v) { Array($0) } }
