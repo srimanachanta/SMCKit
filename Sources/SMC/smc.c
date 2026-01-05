@@ -110,7 +110,7 @@ SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
 
   const UInt32 keyCode = FourCharCodeFromString(key);
   inputStructure.key = keyCode;
-  StringFromFourCharCode(keyCode, val->key);
+  StringFromFourCharCode(keyCode, &val->key);
 
   result = SMCGetKeyInfo(keyCode, &outputStructure.keyInfo, conn);
 
@@ -146,15 +146,15 @@ SMCResult_t SMCWriteKey(const SMCVal_t *val, const io_connect_t conn) {
 
   SMCKeyData_keyInfo_t keyData;
 
-  const UInt32 keyCode = FourCharCodeFromString(val.key);
+  const UInt32 keyCode = FourCharCodeFromString(&val->key);
   result = SMCGetKeyInfo(keyCode, &keyData, conn);
   if (result.kern_res != kIOReturnSuccess ||
       result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
-  if (keyData.dataSize != val.dataSize ||
-      keyData.dataType != FourCharCodeFromString(val.dataType)) {
+  if (keyData.dataSize != val->dataSize ||
+      keyData.dataType != FourCharCodeFromString(&val->dataType)) {
     result.kern_res = kIOReturnBadArgument;
     result.smc_res = kSMCReturnDataTypeMismatch;
     return result;
@@ -168,8 +168,8 @@ SMCResult_t SMCWriteKey(const SMCVal_t *val, const io_connect_t conn) {
 
   inputStructure.key = keyCode;
   inputStructure.data8 = SMC_CMD_WRITE_KEY;
-  inputStructure.keyInfo.dataSize = val.dataSize;
-  memcpy(inputStructure.bytes, val.bytes, sizeof(val.bytes));
+  inputStructure.keyInfo.dataSize = val->dataSize;
+  memcpy(inputStructure.bytes, val->bytes, sizeof(val->bytes));
 
   result.kern_res =
       SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
@@ -208,7 +208,7 @@ SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t *key,
     return result;
   }
 
-  StringFromFourCharCode(outputStructure.key, *key);
+  StringFromFourCharCode(outputStructure.key, key);
 
   return result;
 }
