@@ -254,4 +254,8 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
   return result;
 }
 
-void SMCCleanupCache(void) { destroy_cache(); }
+void SMCCleanupCache(void) {
+  pthread_mutex_lock(&g_keyInfoCacheLock);
+  destroy_cache();
+  pthread_mutex_unlock(&g_keyInfoCacheLock);
+}
