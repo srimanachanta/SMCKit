@@ -2,21 +2,17 @@ import Foundation
 import IOKit
 import SMC
 
-public class SMCKit {
-    public static let shared = SMCKit()
+public final class SMCKit {
+    public static let shared: SMCKit = try! SMCKit()
 
     private var connection: io_connect_t = 0
 
-    private init() {
+    private init() throws {
         var conn: io_connect_t = 0
         let result = SMCOpen(&conn)
 
-        // A fatal error is appropriate here, as the library is unusable
-        // without a connection to the SMC driver.
         guard result == kIOReturnSuccess else {
-            fatalError(
-                "SMCKit: Failed to open connection to AppleSMC. Error: \(result)"
-            )
+            throw SMCError.connectionFailed(kIOReturn: result)
         }
         self.connection = conn
     }

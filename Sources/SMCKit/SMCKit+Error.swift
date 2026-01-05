@@ -5,6 +5,7 @@ public enum SMCError: Error {
     case keyNotFound(key: String)
     case notPrivileged
     case dataTypeMismatch(key: String)
+    case connectionFailed(kIOReturn: kern_return_t)
 
     /// https://developer.apple.com/library/mac/qa/qa1075/_index.html
     ///
