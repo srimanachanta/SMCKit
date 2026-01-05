@@ -28,12 +28,14 @@ extension FourCharCode {
     }
 
     internal func toCharArray() -> UInt32Char_t {
-        return (
-            UInt8((self >> 24) & 0xFF),
-            UInt8((self >> 16) & 0xFF),
-            UInt8((self >> 8) & 0xFF),
-            UInt8(self & 0xFF),
-            UInt8(0)
+        return UInt32Char_t(
+            chars: (
+                UInt8((self >> 24) & 0xFF),
+                UInt8((self >> 16) & 0xFF),
+                UInt8((self >> 8) & 0xFF),
+                UInt8(self & 0xFF),
+                UInt8(0)
+            )
         )
     }
 }

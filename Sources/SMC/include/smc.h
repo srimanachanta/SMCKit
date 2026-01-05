@@ -79,7 +79,9 @@ typedef struct {
   SMCBytes_t bytes;
 } SMCKeyData_t;
 
-typedef unsigned char UInt32Char_t[5];
+typedef struct {
+  unsigned char chars[5];
+} UInt32Char_t;
 
 typedef struct {
   UInt32Char_t key;
@@ -96,8 +98,9 @@ typedef struct {
 kern_return_t SMCOpen(io_connect_t *conn);
 kern_return_t SMCClose(io_connect_t conn);
 
-SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t *val, io_connect_t conn);
-SMCResult_t SMCWriteKey(SMCVal_t val, io_connect_t conn);
+SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
+                       io_connect_t conn);
+SMCResult_t SMCWriteKey(const SMCVal_t *val, io_connect_t conn);
 SMCResult_t SMCGetKeyFromIndex(UInt32 index, UInt32Char_t *key,
                                io_connect_t conn);
 SMCResult_t SMCGetKeyInfo(UInt32 key, SMCKeyData_keyInfo_t *keyInfo,

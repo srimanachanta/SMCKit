@@ -114,8 +114,8 @@ public class SMCKit {
     public func allKeys() throws -> [FourCharCode] {
         let numKeys = try self.numKeys()
 
-        let keys = try (0..<numKeys).compactMap { index in
-            var keyBuffer: UInt32Char_t = (0, 0, 0, 0, 0)
+        for index in 0..<numKeys {
+            var keyBuffer = UInt32Char_t(chars: (0, 0, 0, 0, 0))
 
             let result = SMCGetKeyFromIndex(index, &keyBuffer, self.connection)
 

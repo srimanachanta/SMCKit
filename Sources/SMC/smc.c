@@ -50,17 +50,21 @@ static void destroy_cache(void) {
   g_keyInfoCache = NULL;
 }
 
-UInt32 FourCharCodeFromString(const UInt32Char_t str) {
-  return ((UInt32)str[0] << 24) | ((UInt32)str[1] << 16) |
-         ((UInt32)str[2] << 8) | ((UInt32)str[3]);
+UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
+  if (str == NULL)
+    return 0;
+  return ((UInt32)str->chars[0] << 24) | ((UInt32)str->chars[1] << 16) |
+         ((UInt32)str->chars[2] << 8) | ((UInt32)str->chars[3]);
 }
 
-void StringFromFourCharCode(const UInt32 code, UInt32Char_t out) {
-  out[0] = (code >> 24) & 0xFF;
-  out[1] = (code >> 16) & 0xFF;
-  out[2] = (code >> 8) & 0xFF;
-  out[3] = code & 0xFF;
-  out[4] = '\0';
+void StringFromFourCharCode(const UInt32 code, UInt32Char_t *out) {
+  if (out == NULL)
+    return;
+  out->chars[0] = (code >> 24) & 0xFF;
+  out->chars[1] = (code >> 16) & 0xFF;
+  out->chars[2] = (code >> 8) & 0xFF;
+  out->chars[3] = code & 0xFF;
+  out->chars[4] = '\0';
 }
 
 kern_return_t SMCOpen(io_connect_t *conn) {
@@ -89,7 +93,7 @@ kern_return_t SMCCall(const int selector, const SMCKeyData_t *inputStructure,
                                    &structureOutputSize);
 }
 
-SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t *val,
+SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
                        const io_connect_t conn) {
   SMCResult_t result;
 
@@ -112,7 +116,7 @@ SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t *val,
   }
 
   val->dataSize = outputStructure.keyInfo.dataSize;
-  StringFromFourCharCode(outputStructure.keyInfo.dataType, val->dataType);
+  StringFromFourCharCode(outputStructure.keyInfo.dataType, &val->dataType);
 
   inputStructure.keyInfo.dataSize = val->dataSize;
   inputStructure.data8 = SMC_CMD_READ_KEY;
