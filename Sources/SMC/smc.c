@@ -36,11 +36,7 @@ static mapKeyInfo_t *g_keyInfoCache = NULL;
 static pthread_mutex_t g_keyInfoCacheLock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t g_cacheInitOnce = PTHREAD_ONCE_INIT;
 
-static void init_cache(void) {
-  if (g_keyInfoCache != NULL)
-    return;
-  g_keyInfoCache = mapKeyInfo_init();
-}
+static void init_cache(void) { g_keyInfoCache = mapKeyInfo_init(); }
 
 static void destroy_cache(void) {
   if (g_keyInfoCache == NULL)
