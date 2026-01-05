@@ -37,11 +37,12 @@ public class SMCKit {
                 size: UInt32(keyInfo.dataSize)
             )
         case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-            throw SMCError.keyNotFound(code: key.toString())
+            throw SMCError.keyNotFound(key: key.toString())
         case (kIOReturnNotPrivileged, _):
             throw SMCError.notPrivileged
         default:
             throw SMCError.unknown(
+                key: key.toString(),
                 kIOReturn: result.kern_res,
                 SMCResult: result.smc_res
             )
@@ -69,11 +70,12 @@ public class SMCKit {
         case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
             return try V(smcVal.bytes)
         case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-            throw SMCError.keyNotFound(code: key.toString())
+            throw SMCError.keyNotFound(key: key.toString())
         case (kIOReturnNotPrivileged, _):
             throw SMCError.notPrivileged
         default:
             throw SMCError.unknown(
+                key: key.toString(),
                 kIOReturn: result.kern_res,
                 SMCResult: result.smc_res
             )
@@ -94,13 +96,14 @@ public class SMCKit {
         case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
             break
         case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-            throw SMCError.keyNotFound(code: key.toString())
+            throw SMCError.keyNotFound(key: key.toString())
         case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
-            throw SMCError.dataTypeMismatch
+            throw SMCError.dataTypeMismatch(key: key.toString())
         case (kIOReturnNotPrivileged, _):
             throw SMCError.notPrivileged
         default:
             throw SMCError.unknown(
+                key: key.toString(),
                 kIOReturn: result.kern_res,
                 SMCResult: result.smc_res
             )
@@ -113,6 +116,8 @@ public class SMCKit {
 
     public func allKeys() throws -> [FourCharCode] {
         let numKeys = try self.numKeys()
+        var keys: [FourCharCode] = []
+        keys.reserveCapacity(Int(numKeys))
 
         for index in 0..<numKeys {
             var keyBuffer = UInt32Char_t(chars: (0, 0, 0, 0, 0))
@@ -121,15 +126,16 @@ public class SMCKit {
 
             switch (result.kern_res, result.smc_res) {
             case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
-                return FourCharCode(fromCharArray: keyBuffer)
+                keys.append(FourCharCode(fromCharArray: keyBuffer))
             case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-                throw SMCError.keyNotFound(code: "Index \(index)")
+                throw SMCError.keyNotFound(key: "Index \(index)")
             case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
-                throw SMCError.dataTypeMismatch
+                throw SMCError.dataTypeMismatch(key: "Index \(index)")
             case (kIOReturnNotPrivileged, _):
                 throw SMCError.notPrivileged
             default:
                 throw SMCError.unknown(
+                    key: "Index \(index)",
                     kIOReturn: result.kern_res,
                     SMCResult: result.smc_res
                 )
