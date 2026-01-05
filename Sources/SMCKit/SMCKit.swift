@@ -23,6 +23,13 @@ public actor SMCKit {
         SMCClose(connection)
     }
 
+    /// Clears the internal key information cache.
+    /// This can be useful to free memory if you've queried many keys and won't need them again.
+    /// Note: The cache is global and shared across the application.
+    public func clearCache() {
+        SMCCleanupCache()
+    }
+
     public func getKeyInformation(_ key: FourCharCode) throws -> DataType {
         var keyInfo = SMCKeyData_keyInfo_t()
         let result = SMCGetKeyInfo(key, &keyInfo, self.connection)
