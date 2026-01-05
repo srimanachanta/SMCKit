@@ -2,7 +2,8 @@ import Foundation
 import IOKit
 import SMC
 
-public final class SMCKit {
+@available(macOS 10.15, *)
+public actor SMCKit {
     public static let shared: SMCKit = try! SMCKit()
 
     private var connection: io_connect_t = 0
