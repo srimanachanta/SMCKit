@@ -64,6 +64,10 @@ void StringFromFourCharCode(const UInt32 code, UInt32Char_t *out) {
 }
 
 kern_return_t SMCOpen(io_connect_t *conn) {
+  if (conn == NULL) {
+    return kIOReturnBadArgument;
+  }
+
   const io_service_t service = IOServiceGetMatchingService(
       kIOMainPortDefault, IOServiceMatching("AppleSMC"));
   if (service == 0) {
@@ -91,7 +95,11 @@ kern_return_t SMCCall(const int selector, const SMCKeyData_t *inputStructure,
 
 SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
                        const io_connect_t conn) {
-  SMCResult_t result;
+  SMCResult_t result = {kIOReturnBadArgument, kSMCReturnError};
+
+  if (key == NULL || val == NULL) {
+    return result;
+  }
 
   SMCKeyData_t inputStructure;
   SMCKeyData_t outputStructure;
@@ -129,8 +137,12 @@ SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
   return result;
 }
 
-SMCResult_t SMCWriteKey(const SMCVal_t val, const io_connect_t conn) {
-  SMCResult_t result;
+SMCResult_t SMCWriteKey(const SMCVal_t *val, const io_connect_t conn) {
+  SMCResult_t result = {kIOReturnBadArgument, kSMCReturnError};
+
+  if (val == NULL) {
+    return result;
+  }
 
   SMCKeyData_keyInfo_t keyData;
 
@@ -173,7 +185,11 @@ SMCResult_t SMCWriteKey(const SMCVal_t val, const io_connect_t conn) {
 
 SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t *key,
                                const io_connect_t conn) {
-  SMCResult_t result;
+  SMCResult_t result = {kIOReturnBadArgument, kSMCReturnError};
+
+  if (key == NULL) {
+    return result;
+  }
 
   SMCKeyData_t inputStructure;
   SMCKeyData_t outputStructure;
@@ -199,7 +215,11 @@ SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t *key,
 
 SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
                           const io_connect_t conn) {
-  SMCResult_t result;
+  SMCResult_t result = {kIOReturnBadArgument, kSMCReturnError};
+
+  if (keyInfo == NULL) {
+    return result;
+  }
 
   pthread_once(&g_cacheInitOnce, init_cache);
 
