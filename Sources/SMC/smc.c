@@ -29,27 +29,30 @@
 #include "khashl.h"
 #include "smc.h"
 
-KHASHL_MAP_INIT(KH_LOCAL, mapKeyInfo_t, mapKeyInfo, uint32_t, SMCKeyData_keyInfo_t, kh_hash_uint32,
-                kh_eq_generic)
+KHASHL_MAP_INIT(KH_LOCAL, mapKeyInfo_t, mapKeyInfo, uint32_t,
+                SMCKeyData_keyInfo_t, kh_hash_uint32, kh_eq_generic)
 
-static mapKeyInfo_t* g_keyInfoCache = NULL;
+static mapKeyInfo_t *g_keyInfoCache = NULL;
 static pthread_mutex_t g_keyInfoCacheLock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_once_t g_cacheInitOnce = PTHREAD_ONCE_INIT;
 
 static void init_cache(void) {
-  if (g_keyInfoCache != NULL) return;
+  if (g_keyInfoCache != NULL)
+    return;
   g_keyInfoCache = mapKeyInfo_init();
 }
 
 static void destroy_cache(void) {
-  if (g_keyInfoCache == NULL) return;
+  if (g_keyInfoCache == NULL)
+    return;
 
   mapKeyInfo_destroy(g_keyInfoCache);
   g_keyInfoCache = NULL;
 }
 
 UInt32 FourCharCodeFromString(const UInt32Char_t str) {
-  return ((UInt32)str[0] << 24) | ((UInt32)str[1] << 16) | ((UInt32)str[2] << 8) | ((UInt32)str[3]);
+  return ((UInt32)str[0] << 24) | ((UInt32)str[1] << 16) |
+         ((UInt32)str[2] << 8) | ((UInt32)str[3]);
 }
 
 void StringFromFourCharCode(const UInt32 code, UInt32Char_t out) {
@@ -60,13 +63,15 @@ void StringFromFourCharCode(const UInt32 code, UInt32Char_t out) {
   out[4] = '\0';
 }
 
-kern_return_t SMCOpen(io_connect_t* conn) {
-  const io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleSMC"));
+kern_return_t SMCOpen(io_connect_t *conn) {
+  const io_service_t service = IOServiceGetMatchingService(
+      kIOMainPortDefault, IOServiceMatching("AppleSMC"));
   if (service == 0) {
     return kIOReturnNotFound;
   }
 
-  const kern_return_t result = IOServiceOpen(service, mach_task_self(), 0, conn);
+  const kern_return_t result =
+      IOServiceOpen(service, mach_task_self(), 0, conn);
   IOObjectRelease(service);
 
   return result;
@@ -74,16 +79,18 @@ kern_return_t SMCOpen(io_connect_t* conn) {
 
 kern_return_t SMCClose(const io_connect_t conn) { return IOServiceClose(conn); }
 
-kern_return_t SMCCall(const int selector, const SMCKeyData_t* inputStructure, SMCKeyData_t* outputStructure,
-                      const io_connect_t conn) {
+kern_return_t SMCCall(const int selector, const SMCKeyData_t *inputStructure,
+                      SMCKeyData_t *outputStructure, const io_connect_t conn) {
   const size_t structureInputSize = sizeof(SMCKeyData_t);
   size_t structureOutputSize = sizeof(SMCKeyData_t);
 
-  return IOConnectCallStructMethod(conn, selector, inputStructure, structureInputSize, outputStructure,
+  return IOConnectCallStructMethod(conn, selector, inputStructure,
+                                   structureInputSize, outputStructure,
                                    &structureOutputSize);
 }
 
-SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t* val, const io_connect_t conn) {
+SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t *val,
+                       const io_connect_t conn) {
   SMCResult_t result;
 
   SMCKeyData_t inputStructure;
@@ -99,7 +106,8 @@ SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t* val, const io_connect_t conn)
 
   result = SMCGetKeyInfo(keyCode, &outputStructure.keyInfo, conn);
 
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
@@ -109,9 +117,11 @@ SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t* val, const io_connect_t conn)
   inputStructure.keyInfo.dataSize = val->dataSize;
   inputStructure.data8 = SMC_CMD_READ_KEY;
 
-  result.kern_res = SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
+  result.kern_res =
+      SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
   result.smc_res = outputStructure.result;
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
@@ -126,11 +136,13 @@ SMCResult_t SMCWriteKey(const SMCVal_t val, const io_connect_t conn) {
 
   const UInt32 keyCode = FourCharCodeFromString(val.key);
   result = SMCGetKeyInfo(keyCode, &keyData, conn);
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
-  if (keyData.dataSize != val.dataSize || keyData.dataType != FourCharCodeFromString(val.dataType)) {
+  if (keyData.dataSize != val.dataSize ||
+      keyData.dataType != FourCharCodeFromString(val.dataType)) {
     result.kern_res = kIOReturnBadArgument;
     result.smc_res = kSMCReturnDataTypeMismatch;
     return result;
@@ -147,17 +159,20 @@ SMCResult_t SMCWriteKey(const SMCVal_t val, const io_connect_t conn) {
   inputStructure.keyInfo.dataSize = val.dataSize;
   memcpy(inputStructure.bytes, val.bytes, sizeof(val.bytes));
 
-  result.kern_res = SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
+  result.kern_res =
+      SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
   result.smc_res = outputStructure.result;
 
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
   return result;
 }
 
-SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t* key, const io_connect_t conn) {
+SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t *key,
+                               const io_connect_t conn) {
   SMCResult_t result;
 
   SMCKeyData_t inputStructure;
@@ -169,9 +184,11 @@ SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t* key, const io_c
   inputStructure.data8 = SMC_CMD_GET_KEY_FROM_INDEX;
   inputStructure.data32 = index;
 
-  result.kern_res = SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
+  result.kern_res =
+      SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
   result.smc_res = outputStructure.result;
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 
@@ -180,7 +197,8 @@ SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t* key, const io_c
   return result;
 }
 
-SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t* keyInfo, const io_connect_t conn) {
+SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
+                          const io_connect_t conn) {
   SMCResult_t result;
 
   pthread_once(&g_cacheInitOnce, init_cache);
@@ -209,9 +227,11 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t* keyInfo, const
   inputStructure.key = key;
   inputStructure.data8 = SMC_CMD_READ_KEY_INFO;
 
-  result.kern_res = SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
+  result.kern_res =
+      SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
   result.smc_res = outputStructure.result;
-  if (result.kern_res != kIOReturnSuccess || result.smc_res != kSMCReturnSuccess) {
+  if (result.kern_res != kIOReturnSuccess ||
+      result.smc_res != kSMCReturnSuccess) {
     return result;
   }
 

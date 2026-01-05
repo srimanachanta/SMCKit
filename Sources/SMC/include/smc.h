@@ -29,9 +29,9 @@
 
 #define SMC_KERNEL_INDEX 2
 
-#define SMC_CMD_READ_KEY 5            // Read value at key
-#define SMC_CMD_WRITE_KEY 6           // Write value at Key
-#define SMC_CMD_GET_KEY_FROM_INDEX 8  // Get key at SMC table index
+#define SMC_CMD_READ_KEY 5           // Read value at key
+#define SMC_CMD_WRITE_KEY 6          // Write value at Key
+#define SMC_CMD_GET_KEY_FROM_INDEX 8 // Get key at SMC table index
 #define SMC_CMD_READ_KEY_INFO 9
 #define SMC_CMD_READ_POWER_LIMIT 11
 #define SMC_CMD_READ_VERSION 12
@@ -74,8 +74,8 @@ typedef struct {
   SMCKeyData_keyInfo_t keyInfo;
   UInt8 result;
   UInt8 status;
-  UInt8 data8;    // CMD Selector
-  UInt32 data32;  // CMD Context
+  UInt8 data8;   // CMD Selector
+  UInt32 data32; // CMD Context
   SMCBytes_t bytes;
 } SMCKeyData_t;
 
@@ -93,13 +93,15 @@ typedef struct {
   smc_return_t smc_res;
 } SMCResult_t;
 
-kern_return_t SMCOpen(io_connect_t* conn);
+kern_return_t SMCOpen(io_connect_t *conn);
 kern_return_t SMCClose(io_connect_t conn);
 
-SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t* val, io_connect_t conn);
+SMCResult_t SMCReadKey(UInt32Char_t key, SMCVal_t *val, io_connect_t conn);
 SMCResult_t SMCWriteKey(SMCVal_t val, io_connect_t conn);
-SMCResult_t SMCGetKeyFromIndex(UInt32 index, UInt32Char_t* key, io_connect_t conn);
-SMCResult_t SMCGetKeyInfo(UInt32 key, SMCKeyData_keyInfo_t* keyInfo, io_connect_t conn);
+SMCResult_t SMCGetKeyFromIndex(UInt32 index, UInt32Char_t *key,
+                               io_connect_t conn);
+SMCResult_t SMCGetKeyInfo(UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
+                          io_connect_t conn);
 
 void SMCCleanupCache(void);
 
