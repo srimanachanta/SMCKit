@@ -1,13 +1,29 @@
 import Foundation
 import SMC
 
-extension FourCharCode {
+extension FourCharCode: @retroactive ExpressibleByStringLiteral {
     public init(fromStaticString str: StaticString) {
         precondition(str.utf8CodeUnitCount == 4)
 
         self = str.withUTF8Buffer { buffer in
             buffer.reduce(UInt32(0)) { $0 << 8 | UInt32($1) }
         }
+    }
+
+    public init(stringLiteral value: String) {
+        precondition(
+            value.count == 4,
+            "FourCharCode must be exactly 4 characters"
+        )
+        let bytes = Array(value.utf8)
+        precondition(
+            bytes.count == 4,
+            "FourCharCode must be exactly 4 UTF-8 bytes"
+        )
+        self =
+            (UInt32(bytes[0]) << 24) | (UInt32(bytes[1]) << 16)
+            | (UInt32(bytes[2]) << 8)
+            | UInt32(bytes[3])
     }
 
     public init(fromCharArray charArray: UInt32Char_t) {
