@@ -12,9 +12,10 @@ extension FourCharCode {
 
     public init(fromCharArray charArray: UInt32Char_t) {
         self =
-            (UInt32(charArray.0) << 24) | (UInt32(charArray.1) << 16)
-            | (UInt32(charArray.2) << 8)
-            | UInt32(charArray.3)
+            (UInt32(charArray.chars.0) << 24)
+            | (UInt32(charArray.chars.1) << 16)
+            | (UInt32(charArray.chars.2) << 8)
+            | UInt32(charArray.chars.3)
     }
 
     public func toString() -> String {
@@ -141,8 +142,8 @@ extension UInt32: SMCCodable {
 
     public init(_ raw: SMCBytes_t) throws {
         self =
-            (UInt32(raw.0) << 24) | (UInt32(raw.1) << 16) | (UInt32(raw.2) << 8)
-            | UInt32(raw.3)
+            (UInt32(raw.0) << 24) | (UInt32(raw.1) << 16)
+            | (UInt32(raw.2) << 8) | UInt32(raw.3)
     }
 
     public func encode() throws -> SMCBytes_t {

@@ -79,14 +79,14 @@ public final class SMCKit {
     }
 
     public func write<V: SMCCodable>(_ key: FourCharCode, _ value: V) throws {
-        let buf = SMCVal_t(
+        var buf = SMCVal_t(
             key: key.toCharArray(),
             dataSize: V.smcDataType.size,
             dataType: V.smcDataType.type.toCharArray(),
             bytes: try value.encode()
         )
 
-        let result = SMCWriteKey(buf, self.connection)
+        let result = SMCWriteKey(&buf, self.connection)
 
         switch (result.kern_res, result.smc_res) {
         case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
@@ -118,7 +118,11 @@ public final class SMCKit {
         for index in 0..<numKeys {
             var keyBuffer = UInt32Char_t(chars: (0, 0, 0, 0, 0))
 
-            let result = SMCGetKeyFromIndex(index, &keyBuffer, self.connection)
+            let result = SMCGetKeyFromIndex(
+                index,
+                &keyBuffer,
+                self.connection
+            )
 
             switch (result.kern_res, result.smc_res) {
             case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
