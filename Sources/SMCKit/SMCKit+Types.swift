@@ -214,7 +214,58 @@ extension Int32: SMCCodable {
             UInt8((u >> 24) & 0xFF),
             UInt8((u >> 16) & 0xFF),
             UInt8((u >> 8) & 0xFF),
+        ])
+    }
+}
+
+extension UInt64: SMCCodable {
+    public static var smcDataType: DataType { DataTypes.UInt64 }
+
+    public init(_ raw: SMCBytes_t) throws {
+        self =
+            UInt64(raw.0) | (UInt64(raw.1) << 8)
+            | (UInt64(raw.2) << 16) | (UInt64(raw.3) << 24)
+            | (UInt64(raw.4) << 32) | (UInt64(raw.5) << 40)
+            | (UInt64(raw.6) << 48) | (UInt64(raw.7) << 56)
+    }
+
+    public func encode() throws -> SMCBytes_t {
+        smcBytes([
+            UInt8(self & 0xFF),
+            UInt8((self >> 8) & 0xFF),
+            UInt8((self >> 16) & 0xFF),
+            UInt8((self >> 24) & 0xFF),
+            UInt8((self >> 32) & 0xFF),
+            UInt8((self >> 40) & 0xFF),
+            UInt8((self >> 48) & 0xFF),
+            UInt8((self >> 56) & 0xFF),
+        ])
+    }
+}
+
+extension Int64: SMCCodable {
+    public static var smcDataType: DataType { DataTypes.Int64 }
+
+    public init(_ raw: SMCBytes_t) throws {
+        let u =
+            UInt64(raw.0) | (UInt64(raw.1) << 8)
+            | (UInt64(raw.2) << 16) | (UInt64(raw.3) << 24)
+            | (UInt64(raw.4) << 32) | (UInt64(raw.5) << 40)
+            | (UInt64(raw.6) << 48) | (UInt64(raw.7) << 56)
+        self = Int64(bitPattern: u)
+    }
+
+    public func encode() throws -> SMCBytes_t {
+        let u = UInt64(bitPattern: self)
+        return smcBytes([
             UInt8(u & 0xFF),
+            UInt8((u >> 8) & 0xFF),
+            UInt8((u >> 16) & 0xFF),
+            UInt8((u >> 24) & 0xFF),
+            UInt8((u >> 32) & 0xFF),
+            UInt8((u >> 40) & 0xFF),
+            UInt8((u >> 48) & 0xFF),
+            UInt8((u >> 56) & 0xFF),
         ])
     }
 }
