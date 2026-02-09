@@ -106,6 +106,15 @@ enum DataTypes {
         type: FourCharCode(fromStaticString: "flt "),
         size: 4
     )
+
+    static let HexData = DataType(
+        type: FourCharCode(fromStaticString: "hex_"),
+        size: 0
+    )
+    static let Ch8String = DataType(
+        type: FourCharCode(fromStaticString: "ch8*"),
+        size: 0
+    )
 }
 
 public protocol SMCCodable {

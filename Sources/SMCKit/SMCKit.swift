@@ -114,6 +114,174 @@ public actor SMCKit {
         }
     }
 
+    public func readData(_ key: FourCharCode) throws -> Data {
+        var keyCharArray = key.toCharArray()
+        var smcVal = SMCVal_t()
+
+        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
+
+        switch (result.kern_res, result.smc_res) {
+        case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+            let validSize = min(Int(smcVal.dataSize), MemoryLayout<SMCBytes_t>.size)
+            return withUnsafeBytes(of: smcVal.bytes) { buffer in
+                Data(buffer.prefix(validSize))
+            }
+        case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+            throw SMCError.keyNotFound(key: key.toString())
+        case (kIOReturnNotPrivileged, _):
+            throw SMCError.notPrivileged
+        default:
+            throw SMCError.unknown(
+                key: key.toString(),
+                kIOReturn: result.kern_res,
+                SMCResult: result.smc_res
+            )
+        }
+    }
+
+    public func readString(_ key: FourCharCode) throws -> String {
+        var keyCharArray = key.toCharArray()
+        var smcVal = SMCVal_t()
+
+        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
+
+        switch (result.kern_res, result.smc_res) {
+        case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+            let validSize = min(Int(smcVal.dataSize), MemoryLayout<SMCBytes_t>.size)
+            let bytes = withUnsafeBytes(of: smcVal.bytes) { buffer in
+                Array(buffer.prefix(validSize))
+            }
+
+            let endIndex = bytes.firstIndex(of: 0) ?? bytes.count
+            let stringBytes = Array(bytes.prefix(endIndex))
+
+            guard let string = String(bytes: stringBytes, encoding: .ascii) else {
+                throw SMCError.invalidStringData(key: key.toString())
+            }
+            return string
+        case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+            throw SMCError.keyNotFound(key: key.toString())
+        case (kIOReturnNotPrivileged, _):
+            throw SMCError.notPrivileged
+        default:
+            throw SMCError.unknown(
+                key: key.toString(),
+                kIOReturn: result.kern_res,
+                SMCResult: result.smc_res
+            )
+        }
+    }
+
+    public func writeData(_ key: FourCharCode, _ value: Data) throws {
+        let keyInfo = try getKeyInformation(key)
+
+        guard keyInfo.type == DataTypes.HexData.type else {
+            throw SMCError.dataTypeMismatch(key: key.toString())
+        }
+
+        guard value.count == keyInfo.size else {
+            throw SMCError.invalidDataSize(
+                key: key.toString(),
+                expected: keyInfo.size,
+                actual: UInt32(value.count)
+            )
+        }
+
+        var bytes: SMCBytes_t = (
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0
+        )
+        value.withUnsafeBytes { buffer in
+            withUnsafeMutableBytes(of: &bytes) { dest in
+                dest.copyBytes(
+                    from: buffer.prefix(min(buffer.count, MemoryLayout<SMCBytes_t>.size)))
+            }
+        }
+
+        var buf = SMCVal_t(
+            key: key.toCharArray(),
+            dataSize: keyInfo.size,
+            dataType: keyInfo.type.toCharArray(),
+            bytes: bytes
+        )
+
+        let result = SMCWriteKey(&buf, self.connection)
+
+        switch (result.kern_res, result.smc_res) {
+        case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+            break
+        case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+            throw SMCError.keyNotFound(key: key.toString())
+        case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
+            throw SMCError.dataTypeMismatch(key: key.toString())
+        case (kIOReturnNotPrivileged, _):
+            throw SMCError.notPrivileged
+        default:
+            throw SMCError.unknown(
+                key: key.toString(),
+                kIOReturn: result.kern_res,
+                SMCResult: result.smc_res
+            )
+        }
+    }
+
+    public func writeString(_ key: FourCharCode, _ value: String) throws {
+        let keyInfo = try getKeyInformation(key)
+
+        guard keyInfo.type == DataTypes.Ch8String.type else {
+            throw SMCError.dataTypeMismatch(key: key.toString())
+        }
+
+        guard let stringBytes = value.data(using: .ascii) else {
+            throw SMCError.invalidStringData(key: key.toString())
+        }
+
+        guard stringBytes.count <= keyInfo.size else {
+            throw SMCError.invalidDataSize(
+                key: key.toString(),
+                expected: keyInfo.size,
+                actual: UInt32(stringBytes.count)
+            )
+        }
+
+        var bytes: SMCBytes_t = (
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0
+        )
+        stringBytes.withUnsafeBytes { buffer in
+            withUnsafeMutableBytes(of: &bytes) { dest in
+                dest.copyBytes(
+                    from: buffer.prefix(min(buffer.count, MemoryLayout<SMCBytes_t>.size)))
+            }
+        }
+
+        var buf = SMCVal_t(
+            key: key.toCharArray(),
+            dataSize: keyInfo.size,
+            dataType: keyInfo.type.toCharArray(),
+            bytes: bytes
+        )
+
+        let result = SMCWriteKey(&buf, self.connection)
+
+        switch (result.kern_res, result.smc_res) {
+        case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
+            break
+        case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
+            throw SMCError.keyNotFound(key: key.toString())
+        case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
+            throw SMCError.dataTypeMismatch(key: key.toString())
+        case (kIOReturnNotPrivileged, _):
+            throw SMCError.notPrivileged
+        default:
+            throw SMCError.unknown(
+                key: key.toString(),
+                kIOReturn: result.kern_res,
+                SMCResult: result.smc_res
+            )
+        }
+    }
+
     public func numKeys() throws -> UInt32 {
         let result: BigEndian<UInt32> = try self.read(FourCharCode(fromStaticString: "#KEY"))
         return result.value
