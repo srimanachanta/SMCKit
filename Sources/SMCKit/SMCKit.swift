@@ -115,7 +115,8 @@ public actor SMCKit {
     }
 
     public func numKeys() throws -> UInt32 {
-        return try self.read(FourCharCode(fromStaticString: "#KEY"))
+        let result: BigEndian<UInt32> = try self.read(FourCharCode(fromStaticString: "#KEY"))
+        return result.value
     }
 
     public func allKeys() throws -> [FourCharCode] {

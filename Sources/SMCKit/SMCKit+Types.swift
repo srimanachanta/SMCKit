@@ -145,11 +145,11 @@ extension UInt16: SMCCodable {
     public static var smcDataType: DataType { DataTypes.UInt16 }
 
     public init(_ raw: SMCBytes_t) throws {
-        self = (UInt16(raw.0) << 8) | UInt16(raw.1)
+        self = UInt16(raw.0) | (UInt16(raw.1) << 8)
     }
 
     public func encode() throws -> SMCBytes_t {
-        smcBytes([UInt8(self >> 8), UInt8(self & 0xFF)])
+        smcBytes([UInt8(self & 0xFF), UInt8(self >> 8)])
     }
 }
 
@@ -158,16 +158,16 @@ extension UInt32: SMCCodable {
 
     public init(_ raw: SMCBytes_t) throws {
         self =
-            (UInt32(raw.0) << 24) | (UInt32(raw.1) << 16)
-            | (UInt32(raw.2) << 8) | UInt32(raw.3)
+            UInt32(raw.0) | (UInt32(raw.1) << 8)
+            | (UInt32(raw.2) << 16) | (UInt32(raw.3) << 24)
     }
 
     public func encode() throws -> SMCBytes_t {
         smcBytes([
-            UInt8((self >> 24) & 0xFF),
-            UInt8((self >> 16) & 0xFF),
-            UInt8((self >> 8) & 0xFF),
             UInt8(self & 0xFF),
+            UInt8((self >> 8) & 0xFF),
+            UInt8((self >> 16) & 0xFF),
+            UInt8((self >> 24) & 0xFF),
         ])
     }
 }
@@ -188,13 +188,13 @@ extension Int16: SMCCodable {
     public static var smcDataType: DataType { DataTypes.Int16 }
 
     public init(_ raw: SMCBytes_t) throws {
-        let unsigned = UInt16(raw.0) << 8 | UInt16(raw.1)
+        let unsigned = UInt16(raw.0) | (UInt16(raw.1) << 8)
         self = Int16(bitPattern: unsigned)
     }
 
     public func encode() throws -> SMCBytes_t {
         let u = UInt16(bitPattern: self)
-        return smcBytes([UInt8(u >> 8), UInt8(u & 0xFF)])
+        return smcBytes([UInt8(u & 0xFF), UInt8(u >> 8)])
     }
 }
 
@@ -203,17 +203,18 @@ extension Int32: SMCCodable {
 
     public init(_ raw: SMCBytes_t) throws {
         let u =
-            UInt32(raw.0) << 24 | UInt32(raw.1) << 16 | UInt32(raw.2) << 8
-            | UInt32(raw.3)
+            UInt32(raw.0) | (UInt32(raw.1) << 8) | (UInt32(raw.2) << 16)
+            | (UInt32(raw.3) << 24)
         self = Int32(bitPattern: u)
     }
 
     public func encode() throws -> SMCBytes_t {
         let u = UInt32(bitPattern: self)
         return smcBytes([
-            UInt8((u >> 24) & 0xFF),
-            UInt8((u >> 16) & 0xFF),
+            UInt8(u & 0xFF),
             UInt8((u >> 8) & 0xFF),
+            UInt8((u >> 16) & 0xFF),
+            UInt8((u >> 24) & 0xFF),
         ])
     }
 }
@@ -292,5 +293,49 @@ extension Bool: SMCCodable {
 
     public func encode() throws -> SMCBytes_t {
         smcBytes([self ? 1 : 0])
+    }
+}
+
+// MARK: - Big-Endian Wrapper
+
+/// A wrapper for reading/writing SMC keys that store integer values in big-endian byte order.
+///
+/// Most SMC keys on Apple Silicon use little-endian byte order, which is what the default
+/// `SMCCodable` conformances use. However, a small number of keys (e.g. `#KEY`, `RBID`, `RBRV`,
+/// `D1BD`, `FOFC`, `MPPR`) store values in big-endian order. Use this wrapper for those keys.
+///
+/// ```swift
+/// let count: BigEndian<UInt32> = try await SMCKit.shared.read("#KEY")
+/// print(count.value) // 3209
+/// ```
+public struct BigEndian<Value: FixedWidthInteger & SMCCodable>: SMCCodable {
+    public let value: Value
+
+    public init(_ value: Value) {
+        self.value = value
+    }
+
+    public static var smcDataType: DataType { Value.smcDataType }
+
+    public init(_ raw: SMCBytes_t) throws {
+        // Read bytes in big-endian order (most significant byte first)
+        var result: Value = 0
+        withUnsafeBytes(of: raw) { buffer in
+            let size = MemoryLayout<Value>.size
+            for i in 0..<size {
+                result |= Value(buffer[i]) << ((size - 1 - i) * 8)
+            }
+        }
+        self.value = result
+    }
+
+    public func encode() throws -> SMCBytes_t {
+        // Write bytes in big-endian order (most significant byte first)
+        let size = MemoryLayout<Value>.size
+        var bytes = [UInt8](repeating: 0, count: size)
+        for i in 0..<size {
+            bytes[i] = UInt8((value >> ((size - 1 - i) * 8)) & 0xFF)
+        }
+        return smcBytes(bytes)
     }
 }

@@ -129,6 +129,41 @@ let flag: Bool = try await SMCKit.shared.read("SOME")
 try await SMCKit.shared.write("SOME", UInt32(42))
 ```
 
+### Byte Ordering
+
+SMCKit uses **little-endian** byte order for all integer types (`UInt8`, `UInt16`, `UInt32`, `UInt64`, `Int8`, `Int16`, `Int32`, `Int64`). This matches the native byte order used by the vast majority of SMC keys on Apple Silicon Macs.
+
+A small number of keys (e.g. `#KEY`, `RBID`, `RBRV`, `D1BD`, `FOFC`, `MPPR`) store values in big-endian byte order. For these keys, use the `BigEndian` wrapper type:
+
+```swift
+// Reading a big-endian key
+let count: BigEndian<UInt32> = try await SMCKit.shared.read("#KEY")
+print(count.value) // 3209
+
+// Writing a big-endian key
+try await SMCKit.shared.write("RBID", BigEndian<UInt32>(4))
+```
+
+Alternatively, you can use `readData`/`writeData` for full control over the raw bytes.
+
+### Variable-Length Types (hex_, ch8*)
+
+Some SMC keys use variable-length data types that don't have a fixed size at compile time. SMCKit provides dedicated methods for these:
+
+```swift
+// Read raw binary data (hex_ type)
+let data: Data = try await SMCKit.shared.readData("SOME")
+
+// Read an ASCII string (ch8* type) - null padding is automatically trimmed
+let name: String = try await SMCKit.shared.readString("RPlt")
+
+// Write raw binary data (size must match the key's expected dataSize)
+try await SMCKit.shared.writeData("SOME", Data([0x01, 0x02, 0x03, 0x04]))
+
+// Write an ASCII string (automatically null-padded to the key's expected dataSize)
+try await SMCKit.shared.writeString("RPlt", "j614s")
+```
+
 ### Cache Management
 
 ```swift
@@ -162,14 +197,18 @@ for key in allKeys {
 
 ## Supported Types
 
-SMCKit supports automatic encoding/decoding for these types:
+SMCKit supports automatic encoding/decoding for these fixed-size types via the `SMCCodable` protocol (all integer types use little-endian byte order):
 
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`
 - `Int8`, `Int16`, `Int32`, `Int64`
 - `Float`
 - `Bool`
+- `BigEndian<T>` — wrapper for the rare SMC keys that use big-endian byte order
 
-All types conform to the `SMCCodable` protocol for seamless conversion to/from SMC byte arrays.
+Variable-length types are supported through dedicated methods:
+
+- `Data` — raw binary data (`hex_` SMC type) via `readData`/`writeData`
+- `String` — ASCII strings (`ch8*` SMC type) via `readString`/`writeString`
 
 ## Error Handling
 
@@ -185,6 +224,10 @@ do {
     print("Wrong data type for key: \(key)")
 } catch SMCError.connectionFailed(let kIOReturn) {
     print("Failed to connect to SMC: \(kIOReturn)")
+} catch SMCError.invalidDataSize(let key, let expected, let actual) {
+    print("Size mismatch for \(key): expected \(expected), got \(actual)")
+} catch SMCError.invalidStringData(let key) {
+    print("Invalid ASCII string data for key: \(key)")
 } catch {
     print("Unknown error: \(error)")
 }
