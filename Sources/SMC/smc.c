@@ -46,14 +46,14 @@ static void destroy_cache(void) {
   g_keyInfoCache = NULL;
 }
 
-UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
+static UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
   if (str == NULL)
     return 0;
   return ((UInt32)str->chars[0] << 24) | ((UInt32)str->chars[1] << 16) |
          ((UInt32)str->chars[2] << 8) | ((UInt32)str->chars[3]);
 }
 
-void StringFromFourCharCode(const UInt32 code, UInt32Char_t *out) {
+static void StringFromFourCharCode(const UInt32 code, UInt32Char_t *out) {
   if (out == NULL)
     return;
   out->chars[0] = (code >> 24) & 0xFF;
@@ -83,8 +83,10 @@ kern_return_t SMCOpen(io_connect_t *conn) {
 
 kern_return_t SMCClose(const io_connect_t conn) { return IOServiceClose(conn); }
 
-kern_return_t SMCCall(const int selector, const SMCKeyData_t *inputStructure,
-                      SMCKeyData_t *outputStructure, const io_connect_t conn) {
+static kern_return_t SMCCall(const int selector,
+                             const SMCKeyData_t *inputStructure,
+                             SMCKeyData_t *outputStructure,
+                             const io_connect_t conn) {
   const size_t structureInputSize = sizeof(SMCKeyData_t);
   size_t structureOutputSize = sizeof(SMCKeyData_t);
 
