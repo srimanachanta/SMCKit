@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "khashl.h"
 #include "smc.h"
