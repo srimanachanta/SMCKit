@@ -96,15 +96,15 @@ typedef struct {
 } SMCResult_t;
 
 kern_return_t SMCOpen(io_connect_t *conn);
-kern_return_t SMCClose(io_connect_t conn);
+kern_return_t SMCClose(const io_connect_t conn);
 
 SMCResult_t SMCReadKey(const UInt32Char_t *key, SMCVal_t *val,
-                       io_connect_t conn);
-SMCResult_t SMCWriteKey(const SMCVal_t *val, io_connect_t conn);
-SMCResult_t SMCGetKeyFromIndex(UInt32 index, UInt32Char_t *key,
-                               io_connect_t conn);
-SMCResult_t SMCGetKeyInfo(UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
-                          io_connect_t conn);
+                       const io_connect_t conn);
+SMCResult_t SMCWriteKey(const SMCVal_t *val, const io_connect_t conn);
+SMCResult_t SMCGetKeyFromIndex(const UInt32 index, UInt32Char_t *key,
+                               const io_connect_t conn);
+SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
+                          const io_connect_t conn);
 
 void SMCCleanupCache(void);
 
