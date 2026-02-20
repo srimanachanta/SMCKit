@@ -35,16 +35,11 @@ KHASHL_MAP_INIT(KH_LOCAL, mapKeyInfo_t, mapKeyInfo, uint32_t,
 
 static mapKeyInfo_t *g_keyInfoCache = NULL;
 static pthread_mutex_t g_keyInfoCacheLock = PTHREAD_MUTEX_INITIALIZER;
-static pthread_once_t g_cacheInitOnce = PTHREAD_ONCE_INIT;
 
-static void init_cache(void) { g_keyInfoCache = mapKeyInfo_init(); }
-
-static void destroy_cache(void) {
-  if (g_keyInfoCache == NULL)
-    return;
-
-  mapKeyInfo_destroy(g_keyInfoCache);
-  g_keyInfoCache = NULL;
+static void ensure_cache_initialized(void) {
+  if (g_keyInfoCache == NULL) {
+    g_keyInfoCache = mapKeyInfo_init();
+  }
 }
 
 static UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
@@ -224,16 +219,20 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
     return result;
   }
 
-  pthread_once(&g_cacheInitOnce, init_cache);
-
   pthread_mutex_lock(&g_keyInfoCacheLock);
+  ensure_cache_initialized();
+
+  if (g_keyInfoCache == NULL) {
+    pthread_mutex_unlock(&g_keyInfoCacheLock);
+    result.kern_res = kIOReturnNoMemory;
+    return result;
+  }
 
   khint_t k = mapKeyInfo_get(g_keyInfoCache, key);
   if (k != kh_end(g_keyInfoCache)) {
     *keyInfo = kh_val(g_keyInfoCache, k);
     pthread_mutex_unlock(&g_keyInfoCacheLock);
 
-    // Returning from cache so set to success
     result.kern_res = kIOReturnSuccess;
     result.smc_res = kSMCReturnSuccess;
     return result;
@@ -275,6 +274,11 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
 
 void SMCCleanupCache(void) {
   pthread_mutex_lock(&g_keyInfoCacheLock);
-  destroy_cache();
+
+  if (g_keyInfoCache != NULL) {
+    mapKeyInfo_destroy(g_keyInfoCache);
+    g_keyInfoCache = NULL;
+  }
+
   pthread_mutex_unlock(&g_keyInfoCacheLock);
 }
