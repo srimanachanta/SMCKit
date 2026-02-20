@@ -173,11 +173,6 @@ SMCResult_t SMCWriteKey(const SMCVal_t *val, const io_connect_t conn) {
       SMCCall(SMC_KERNEL_INDEX, &inputStructure, &outputStructure, conn);
   result.smc_res = outputStructure.result;
 
-  if (result.kern_res != kIOReturnSuccess ||
-      result.smc_res != kSMCReturnSuccess) {
-    return result;
-  }
-
   return result;
 }
 
