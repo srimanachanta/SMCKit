@@ -60,7 +60,7 @@ kern_return_t SMCOpen(io_connect_t *conn) {
 
   const io_service_t service = IOServiceGetMatchingService(
       kIOMainPortDefault, IOServiceMatching("AppleSMC"));
-  if (service == 0) {
+  if (service == IO_OBJECT_NULL) {
     return kIOReturnNotFound;
   }
 
@@ -73,7 +73,7 @@ kern_return_t SMCOpen(io_connect_t *conn) {
 
 kern_return_t SMCClose(const io_connect_t conn) { return IOServiceClose(conn); }
 
-static kern_return_t SMCCall(const int selector,
+static kern_return_t SMCCall(const uint32_t selector,
                              const SMCKeyData_t *inputStructure,
                              SMCKeyData_t *outputStructure,
                              const io_connect_t conn) {
