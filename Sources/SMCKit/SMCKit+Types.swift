@@ -50,7 +50,7 @@ extension FourCharCode: @retroactive ExpressibleByStringLiteral {
     }
 }
 
-public struct DataType: Equatable {
+public struct DataType: Equatable, Sendable {
     public let type: FourCharCode
     public let size: UInt32
 }
