@@ -116,173 +116,74 @@ public protocol SMCCodable {
     func encode() throws -> SMCBytes_t
 }
 
-@inlinable func smcBytes(_ slice: [UInt8]) -> SMCBytes_t {
-    var tmp = [UInt8](repeating: 0, count: 32)
-    tmp.replaceSubrange(0..<min(slice.count, 32), with: slice)
-    return tmp.withUnsafeBytes {
-        $0.load(as: SMCBytes_t.self)
+func smcBytes<Bytes: Collection>(_ bytes: Bytes) -> SMCBytes_t
+where Bytes.Element == UInt8 {
+    var result = SMCVal_t().bytes
+    withUnsafeMutableBytes(of: &result) { buffer in
+        buffer.copyBytes(from: bytes.prefix(buffer.count))
     }
+    return result
 }
 
-@inlinable func toBytes<T>(_ v: T) -> [UInt8] {
-    withUnsafeBytes(of: v) { Array($0) }
+func smcBytes<T>(of value: T) -> SMCBytes_t {
+    withUnsafeBytes(of: value) { smcBytes($0) }
 }
-@inlinable func fromBytes<T>(_ b: [UInt8]) -> T {
-    b.withUnsafeBytes { $0.load(as: T.self) }
+
+func loadValue<T>(_ raw: SMCBytes_t, as type: T.Type = T.self) -> T {
+    withUnsafeBytes(of: raw) { $0.loadUnaligned(as: T.self) }
+}
+
+extension SMCCodable where Self: FixedWidthInteger {
+    public init(_ raw: SMCBytes_t) throws {
+        self.init(littleEndian: loadValue(raw))
+    }
+
+    public func encode() throws -> SMCBytes_t {
+        smcBytes(of: littleEndian)
+    }
 }
 
 extension UInt8: SMCCodable {
     public static var smcDataType: DataType { DataTypes.UInt8 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        self = raw.0
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        smcBytes([self])
-    }
 }
 
 extension UInt16: SMCCodable {
     public static var smcDataType: DataType { DataTypes.UInt16 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        self = UInt16(raw.0) | (UInt16(raw.1) << 8)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        smcBytes([UInt8(self & 0xFF), UInt8(self >> 8)])
-    }
 }
 
 extension UInt32: SMCCodable {
     public static var smcDataType: DataType { DataTypes.UInt32 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        self =
-            UInt32(raw.0) | (UInt32(raw.1) << 8)
-            | (UInt32(raw.2) << 16) | (UInt32(raw.3) << 24)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        smcBytes([
-            UInt8(self & 0xFF),
-            UInt8((self >> 8) & 0xFF),
-            UInt8((self >> 16) & 0xFF),
-            UInt8((self >> 24) & 0xFF),
-        ])
-    }
-}
-
-extension Int8: SMCCodable {
-    public static var smcDataType: DataType { DataTypes.Int8 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        self = Int8(bitPattern: raw.0)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        smcBytes([UInt8(bitPattern: self)])
-    }
-}
-
-extension Int16: SMCCodable {
-    public static var smcDataType: DataType { DataTypes.Int16 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        let unsigned = UInt16(raw.0) | (UInt16(raw.1) << 8)
-        self = Int16(bitPattern: unsigned)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        let u = UInt16(bitPattern: self)
-        return smcBytes([UInt8(u & 0xFF), UInt8(u >> 8)])
-    }
-}
-
-extension Int32: SMCCodable {
-    public static var smcDataType: DataType { DataTypes.Int32 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        let u =
-            UInt32(raw.0) | (UInt32(raw.1) << 8) | (UInt32(raw.2) << 16)
-            | (UInt32(raw.3) << 24)
-        self = Int32(bitPattern: u)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        let u = UInt32(bitPattern: self)
-        return smcBytes([
-            UInt8(u & 0xFF),
-            UInt8((u >> 8) & 0xFF),
-            UInt8((u >> 16) & 0xFF),
-            UInt8((u >> 24) & 0xFF),
-        ])
-    }
 }
 
 extension UInt64: SMCCodable {
     public static var smcDataType: DataType { DataTypes.UInt64 }
+}
 
-    public init(_ raw: SMCBytes_t) throws {
-        self =
-            UInt64(raw.0) | (UInt64(raw.1) << 8)
-            | (UInt64(raw.2) << 16) | (UInt64(raw.3) << 24)
-            | (UInt64(raw.4) << 32) | (UInt64(raw.5) << 40)
-            | (UInt64(raw.6) << 48) | (UInt64(raw.7) << 56)
-    }
+extension Int8: SMCCodable {
+    public static var smcDataType: DataType { DataTypes.Int8 }
+}
 
-    public func encode() throws -> SMCBytes_t {
-        smcBytes([
-            UInt8(self & 0xFF),
-            UInt8((self >> 8) & 0xFF),
-            UInt8((self >> 16) & 0xFF),
-            UInt8((self >> 24) & 0xFF),
-            UInt8((self >> 32) & 0xFF),
-            UInt8((self >> 40) & 0xFF),
-            UInt8((self >> 48) & 0xFF),
-            UInt8((self >> 56) & 0xFF),
-        ])
-    }
+extension Int16: SMCCodable {
+    public static var smcDataType: DataType { DataTypes.Int16 }
+}
+
+extension Int32: SMCCodable {
+    public static var smcDataType: DataType { DataTypes.Int32 }
 }
 
 extension Int64: SMCCodable {
     public static var smcDataType: DataType { DataTypes.Int64 }
-
-    public init(_ raw: SMCBytes_t) throws {
-        let u =
-            UInt64(raw.0) | (UInt64(raw.1) << 8)
-            | (UInt64(raw.2) << 16) | (UInt64(raw.3) << 24)
-            | (UInt64(raw.4) << 32) | (UInt64(raw.5) << 40)
-            | (UInt64(raw.6) << 48) | (UInt64(raw.7) << 56)
-        self = Int64(bitPattern: u)
-    }
-
-    public func encode() throws -> SMCBytes_t {
-        let u = UInt64(bitPattern: self)
-        return smcBytes([
-            UInt8(u & 0xFF),
-            UInt8((u >> 8) & 0xFF),
-            UInt8((u >> 16) & 0xFF),
-            UInt8((u >> 24) & 0xFF),
-            UInt8((u >> 32) & 0xFF),
-            UInt8((u >> 40) & 0xFF),
-            UInt8((u >> 48) & 0xFF),
-            UInt8((u >> 56) & 0xFF),
-        ])
-    }
 }
 
 extension Float: SMCCodable {
     public static var smcDataType: DataType { DataTypes.Float }
 
     public init(_ raw: SMCBytes_t) throws {
-        let bytes = [raw.0, raw.1, raw.2, raw.3]
-        self = fromBytes(bytes)
+        self = loadValue(raw)
     }
 
     public func encode() throws -> SMCBytes_t {
-        smcBytes(toBytes(self))
+        smcBytes(of: self)
     }
 }
 
@@ -294,7 +195,7 @@ extension Bool: SMCCodable {
     }
 
     public func encode() throws -> SMCBytes_t {
-        smcBytes([self ? 1 : 0])
+        smcBytes(of: UInt8(self ? 1 : 0))
     }
 }
 
