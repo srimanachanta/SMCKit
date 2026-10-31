@@ -171,19 +171,21 @@ public final class SMCKit: Sendable {
         return keys
     }
 
-    private func check(_ result: SMCResult_t, key: String) throws {
+    // The key description is only built on failure, so the success path stays
+    // free of string formatting.
+    private func check(_ result: SMCResult_t, key: @autoclosure () -> String) throws {
         switch (result.kern_res, result.smc_res) {
         case (kIOReturnSuccess, UInt8(kSMCReturnSuccess)):
             return
         case (kIOReturnSuccess, UInt8(kSMCReturnKeyNotFound)):
-            throw SMCError.keyNotFound(key: key)
+            throw SMCError.keyNotFound(key: key())
         case (kIOReturnBadArgument, UInt8(kSMCReturnDataTypeMismatch)):
-            throw SMCError.dataTypeMismatch(key: key)
+            throw SMCError.dataTypeMismatch(key: key())
         case (kIOReturnNotPrivileged, _):
             throw SMCError.notPrivileged
         default:
             throw SMCError.unknown(
-                key: key,
+                key: key(),
                 kIOReturn: result.kern_res,
                 SMCResult: result.smc_res
             )
