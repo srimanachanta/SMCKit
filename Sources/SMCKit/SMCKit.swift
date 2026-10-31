@@ -25,10 +25,7 @@ public final class SMCKit: Sendable {
         var keyInfo = SMCKeyData_keyInfo_t()
         let result = SMCGetKeyInfo(key, &keyInfo, self.connection)
         try check(result, key: key.toString())
-        return DataType(
-            type: keyInfo.dataType,
-            size: UInt32(keyInfo.dataSize)
-        )
+        return DataType(type: keyInfo.dataType, size: keyInfo.dataSize)
     }
 
     public func isKeyFound(_ key: FourCharCode) throws -> Bool {
@@ -41,33 +38,15 @@ public final class SMCKit: Sendable {
     }
 
     public func read<V: SMCCodable>(_ key: FourCharCode) throws -> V {
-        var keyCharArray = key.toCharArray()
-        var smcVal = SMCVal_t()
-
-        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
-        try check(result, key: key.toString())
-        return try V(smcVal.bytes)
+        try V(readValue(key).bytes)
     }
 
     public func write<V: SMCCodable>(_ key: FourCharCode, _ value: V) throws {
-        var buf = SMCVal_t(
-            key: key.toCharArray(),
-            dataSize: V.smcDataType.size,
-            dataType: V.smcDataType.type.toCharArray(),
-            bytes: try value.encode()
-        )
-
-        let result = SMCWriteKey(&buf, self.connection)
-        try check(result, key: key.toString())
+        try writeValue(key, dataType: V.smcDataType, bytes: value.encode())
     }
 
     public func readData(_ key: FourCharCode) throws -> Data {
-        var keyCharArray = key.toCharArray()
-        var smcVal = SMCVal_t()
-
-        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
-        try check(result, key: key.toString())
-
+        let smcVal = try readValue(key)
         let validSize = min(Int(smcVal.dataSize), MemoryLayout<SMCBytes_t>.size)
         return withUnsafeBytes(of: smcVal.bytes) { buffer in
             Data(buffer.prefix(validSize))
@@ -75,21 +54,13 @@ public final class SMCKit: Sendable {
     }
 
     public func readString(_ key: FourCharCode) throws -> String {
-        var keyCharArray = key.toCharArray()
-        var smcVal = SMCVal_t()
-
-        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
-        try check(result, key: key.toString())
-
+        let smcVal = try readValue(key)
         let validSize = min(Int(smcVal.dataSize), MemoryLayout<SMCBytes_t>.size)
-        let bytes = withUnsafeBytes(of: smcVal.bytes) { buffer in
-            Array(buffer.prefix(validSize))
+        let string = withUnsafeBytes(of: smcVal.bytes) { buffer in
+            String(bytes: buffer.prefix(validSize).prefix { $0 != 0 }, encoding: .ascii)
         }
 
-        let endIndex = bytes.firstIndex(of: 0) ?? bytes.count
-        let stringBytes = Array(bytes.prefix(endIndex))
-
-        guard let string = String(bytes: stringBytes, encoding: .ascii) else {
+        guard let string else {
             throw SMCError.invalidStringData(key: key.toString())
         }
         return string
@@ -110,15 +81,7 @@ public final class SMCKit: Sendable {
             )
         }
 
-        var buf = SMCVal_t(
-            key: key.toCharArray(),
-            dataSize: keyInfo.size,
-            dataType: keyInfo.type.toCharArray(),
-            bytes: smcBytes(Array(value))
-        )
-
-        let result = SMCWriteKey(&buf, self.connection)
-        try check(result, key: key.toString())
+        try writeValue(key, dataType: keyInfo, bytes: smcBytes(value))
     }
 
     public func writeString(_ key: FourCharCode, _ value: String) throws {
@@ -128,7 +91,8 @@ public final class SMCKit: Sendable {
             throw SMCError.dataTypeMismatch(key: key.toString())
         }
 
-        guard let stringBytes = value.data(using: .ascii) else {
+        let stringBytes = value.utf8
+        guard stringBytes.allSatisfy({ $0 < 0x80 }) else {
             throw SMCError.invalidStringData(key: key.toString())
         }
 
@@ -140,15 +104,7 @@ public final class SMCKit: Sendable {
             )
         }
 
-        var buf = SMCVal_t(
-            key: key.toCharArray(),
-            dataSize: keyInfo.size,
-            dataType: keyInfo.type.toCharArray(),
-            bytes: smcBytes(Array(stringBytes))
-        )
-
-        let result = SMCWriteKey(&buf, self.connection)
-        try check(result, key: key.toString())
+        try writeValue(key, dataType: keyInfo, bytes: smcBytes(stringBytes))
     }
 
     public func numKeys() throws -> UInt32 {
@@ -162,13 +118,38 @@ public final class SMCKit: Sendable {
         keys.reserveCapacity(Int(numKeys))
 
         for index in 0..<numKeys {
-            var keyBuffer = UInt32Char_t(chars: (0, 0, 0, 0, 0))
+            var keyBuffer = UInt32Char_t()
             let result = SMCGetKeyFromIndex(index, &keyBuffer, self.connection)
             try check(result, key: "Index \(index)")
             keys.append(FourCharCode(fromCharArray: keyBuffer))
         }
 
         return keys
+    }
+
+    private func readValue(_ key: FourCharCode) throws -> SMCVal_t {
+        var keyCharArray = key.toCharArray()
+        var smcVal = SMCVal_t()
+
+        let result = SMCReadKey(&keyCharArray, &smcVal, self.connection)
+        try check(result, key: key.toString())
+        return smcVal
+    }
+
+    private func writeValue(
+        _ key: FourCharCode,
+        dataType: DataType,
+        bytes: SMCBytes_t
+    ) throws {
+        var smcVal = SMCVal_t(
+            key: key.toCharArray(),
+            dataSize: dataType.size,
+            dataType: dataType.type.toCharArray(),
+            bytes: bytes
+        )
+
+        let result = SMCWriteKey(&smcVal, self.connection)
+        try check(result, key: key.toString())
     }
 
     // The key description is only built on failure, so the success path stays
