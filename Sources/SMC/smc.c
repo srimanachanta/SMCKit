@@ -22,7 +22,7 @@
  SOFTWARE.
 */
 
-#include <pthread.h>
+#include <os/lock.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,7 +34,7 @@ KHASHL_MAP_INIT(KH_LOCAL, mapKeyInfo_t, mapKeyInfo, uint32_t,
                 SMCKeyData_keyInfo_t, kh_hash_uint32, kh_eq_generic)
 
 static mapKeyInfo_t *g_keyInfoCache = NULL;
-static pthread_mutex_t g_keyInfoCacheLock = PTHREAD_MUTEX_INITIALIZER;
+static os_unfair_lock g_keyInfoCacheLock = OS_UNFAIR_LOCK_INIT;
 
 static UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
   if (str == NULL)
@@ -208,19 +208,19 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
     return result;
   }
 
-  pthread_mutex_lock(&g_keyInfoCacheLock);
+  os_unfair_lock_lock(&g_keyInfoCacheLock);
   if (g_keyInfoCache != NULL) {
     const khint_t k = mapKeyInfo_get(g_keyInfoCache, key);
     if (k != kh_end(g_keyInfoCache)) {
       *keyInfo = kh_val(g_keyInfoCache, k);
-      pthread_mutex_unlock(&g_keyInfoCacheLock);
+      os_unfair_lock_unlock(&g_keyInfoCacheLock);
 
       result.kern_res = kIOReturnSuccess;
       result.smc_res = kSMCReturnSuccess;
       return result;
     }
   }
-  pthread_mutex_unlock(&g_keyInfoCacheLock);
+  os_unfair_lock_unlock(&g_keyInfoCacheLock);
 
   SMCKeyData_t inputStructure;
   SMCKeyData_t outputStructure;
@@ -244,7 +244,7 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
   // Caching is best-effort: an allocation failure here should not fail a
   // lookup that already succeeded against the SMC. The table is checked again
   // because SMCCleanupCache may have run while the lock was released.
-  pthread_mutex_lock(&g_keyInfoCacheLock);
+  os_unfair_lock_lock(&g_keyInfoCacheLock);
   if (g_keyInfoCache == NULL) {
     g_keyInfoCache = mapKeyInfo_init();
   }
@@ -255,18 +255,18 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
       kh_val(g_keyInfoCache, k) = outputStructure.keyInfo;
     }
   }
-  pthread_mutex_unlock(&g_keyInfoCacheLock);
+  os_unfair_lock_unlock(&g_keyInfoCacheLock);
 
   return result;
 }
 
 void SMCCleanupCache(void) {
-  pthread_mutex_lock(&g_keyInfoCacheLock);
+  os_unfair_lock_lock(&g_keyInfoCacheLock);
 
   if (g_keyInfoCache != NULL) {
     mapKeyInfo_destroy(g_keyInfoCache);
     g_keyInfoCache = NULL;
   }
 
-  pthread_mutex_unlock(&g_keyInfoCacheLock);
+  os_unfair_lock_unlock(&g_keyInfoCacheLock);
 }

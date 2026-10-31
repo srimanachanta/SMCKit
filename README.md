@@ -139,7 +139,7 @@ do {
 
 ### C Library (libsmc)
 - Standalone — usable independently in C/C++ projects
-- Global hash map cache with pthread mutex protection to minimize SMC calls
+- Global hash map cache with `os_unfair_lock` protection to minimize SMC calls
 
 ## License
 
