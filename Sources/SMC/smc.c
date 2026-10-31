@@ -36,12 +36,6 @@ KHASHL_MAP_INIT(KH_LOCAL, mapKeyInfo_t, mapKeyInfo, uint32_t,
 static mapKeyInfo_t *g_keyInfoCache = NULL;
 static pthread_mutex_t g_keyInfoCacheLock = PTHREAD_MUTEX_INITIALIZER;
 
-static void ensure_cache_initialized(void) {
-  if (g_keyInfoCache == NULL) {
-    g_keyInfoCache = mapKeyInfo_init();
-  }
-}
-
 static UInt32 FourCharCodeFromString(const UInt32Char_t *str) {
   if (str == NULL)
     return 0;
@@ -215,24 +209,17 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
   }
 
   pthread_mutex_lock(&g_keyInfoCacheLock);
-  ensure_cache_initialized();
+  if (g_keyInfoCache != NULL) {
+    const khint_t k = mapKeyInfo_get(g_keyInfoCache, key);
+    if (k != kh_end(g_keyInfoCache)) {
+      *keyInfo = kh_val(g_keyInfoCache, k);
+      pthread_mutex_unlock(&g_keyInfoCacheLock);
 
-  if (g_keyInfoCache == NULL) {
-    pthread_mutex_unlock(&g_keyInfoCacheLock);
-    result.kern_res = kIOReturnNoMemory;
-    return result;
+      result.kern_res = kIOReturnSuccess;
+      result.smc_res = kSMCReturnSuccess;
+      return result;
+    }
   }
-
-  khint_t k = mapKeyInfo_get(g_keyInfoCache, key);
-  if (k != kh_end(g_keyInfoCache)) {
-    *keyInfo = kh_val(g_keyInfoCache, k);
-    pthread_mutex_unlock(&g_keyInfoCacheLock);
-
-    result.kern_res = kIOReturnSuccess;
-    result.smc_res = kSMCReturnSuccess;
-    return result;
-  }
-
   pthread_mutex_unlock(&g_keyInfoCacheLock);
 
   SMCKeyData_t inputStructure;
@@ -254,14 +241,20 @@ SMCResult_t SMCGetKeyInfo(const UInt32 key, SMCKeyData_keyInfo_t *keyInfo,
 
   *keyInfo = outputStructure.keyInfo;
 
+  // Caching is best-effort: an allocation failure here should not fail a
+  // lookup that already succeeded against the SMC. The table is checked again
+  // because SMCCleanupCache may have run while the lock was released.
   pthread_mutex_lock(&g_keyInfoCacheLock);
-
-  int absent;
-  k = mapKeyInfo_put(g_keyInfoCache, key, &absent);
-  if (absent) {
-    kh_val(g_keyInfoCache, k) = outputStructure.keyInfo;
+  if (g_keyInfoCache == NULL) {
+    g_keyInfoCache = mapKeyInfo_init();
   }
-
+  if (g_keyInfoCache != NULL) {
+    int absent;
+    const khint_t k = mapKeyInfo_put(g_keyInfoCache, key, &absent);
+    if (absent >= 0) {
+      kh_val(g_keyInfoCache, k) = outputStructure.keyInfo;
+    }
+  }
   pthread_mutex_unlock(&g_keyInfoCacheLock);
 
   return result;
