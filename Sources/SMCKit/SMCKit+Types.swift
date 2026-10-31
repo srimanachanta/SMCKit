@@ -208,7 +208,7 @@ extension Bool: SMCCodable {
 /// `D1BD`, `FOFC`, `MPPR`) store values in big-endian order. Use this wrapper for those keys.
 ///
 /// ```swift
-/// let count: BigEndian<UInt32> = try await SMCKit.shared.read("#KEY")
+/// let count: BigEndian<UInt32> = try SMCKit.shared.read("#KEY")
 /// print(count.value) // 3209
 /// ```
 public struct BigEndian<Value: FixedWidthInteger & SMCCodable>: SMCCodable {
@@ -221,24 +221,10 @@ public struct BigEndian<Value: FixedWidthInteger & SMCCodable>: SMCCodable {
     public static var smcDataType: DataType { Value.smcDataType }
 
     public init(_ raw: SMCBytes_t) throws {
-        // Read bytes in big-endian order (most significant byte first)
-        var result: Value = 0
-        withUnsafeBytes(of: raw) { buffer in
-            let size = MemoryLayout<Value>.size
-            for i in 0..<size {
-                result |= Value(buffer[i]) << ((size - 1 - i) * 8)
-            }
-        }
-        self.value = result
+        self.value = Value(bigEndian: loadValue(raw))
     }
 
     public func encode() throws -> SMCBytes_t {
-        // Write bytes in big-endian order (most significant byte first)
-        let size = MemoryLayout<Value>.size
-        var bytes = [UInt8](repeating: 0, count: size)
-        for i in 0..<size {
-            bytes[i] = UInt8((value >> ((size - 1 - i) * 8)) & 0xFF)
-        }
-        return smcBytes(bytes)
+        smcBytes(of: value.bigEndian)
     }
 }
