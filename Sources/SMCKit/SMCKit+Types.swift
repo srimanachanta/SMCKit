@@ -11,19 +11,12 @@ extension FourCharCode: @retroactive ExpressibleByStringLiteral {
     }
 
     public init(stringLiteral value: String) {
-        precondition(
-            value.count == 4,
-            "FourCharCode must be exactly 4 characters"
-        )
-        let bytes = Array(value.utf8)
+        let bytes = value.utf8
         precondition(
             bytes.count == 4,
             "FourCharCode must be exactly 4 UTF-8 bytes"
         )
-        self =
-            (UInt32(bytes[0]) << 24) | (UInt32(bytes[1]) << 16)
-            | (UInt32(bytes[2]) << 8)
-            | UInt32(bytes[3])
+        self = bytes.reduce(UInt32(0)) { $0 << 8 | UInt32($1) }
     }
 
     public init(fromCharArray charArray: UInt32Char_t) {
@@ -35,13 +28,13 @@ extension FourCharCode: @retroactive ExpressibleByStringLiteral {
     }
 
     public func toString() -> String {
-        let bytes: [UInt8] = [
-            UInt8((self >> 24) & 0xFF),
-            UInt8((self >> 16) & 0xFF),
-            UInt8((self >> 8) & 0xFF),
-            UInt8(self & 0xFF),
-        ]
-        return String(bytes.map { Character(UnicodeScalar($0)) })
+        var string = ""
+        for shift in stride(from: 24, through: 0, by: -8) {
+            string.unicodeScalars.append(
+                UnicodeScalar(UInt8(truncatingIfNeeded: self >> shift))
+            )
+        }
+        return string
     }
 
     internal func toCharArray() -> UInt32Char_t {
